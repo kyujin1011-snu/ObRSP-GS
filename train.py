@@ -42,19 +42,17 @@ def seed_all(seed=42):
     
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
+    '''
     # (선택) PyTorch 1.11 이상에서 완전한 결정론 보장
     try:
         torch.use_deterministic_algorithms(True)
     except:
         pass
+    '''
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
              mode, remove_start_iter, remove_tres):
-    ##############
-    seed_all(42)  # ← 여기에 고정!
-    ##############
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -230,6 +228,9 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
         torch.cuda.empty_cache()
 
 if __name__ == "__main__":
+    ##############
+    seed_all(42)  # ← 여기에 고정!
+    ##############
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     lp = ModelParams(parser)
@@ -245,8 +246,6 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
-    args = parser.parse_args(sys.argv[1:])
-    args.save_iterations.append(args.iterations)
 
     ################################
         # 세 가지 인자 추가
@@ -257,6 +256,9 @@ if __name__ == "__main__":
     parser.add_argument("--remove_tres", type=float, default=0.1,
                         help="opacity pruning threshold")
     ###################################
+
+    args = parser.parse_args(sys.argv[1:])
+    args.save_iterations.append(args.iterations)
 
     
     print("Optimizing " + args.model_path)
