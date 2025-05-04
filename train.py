@@ -170,7 +170,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
                     elif any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-                        gaussians.decay_opacity(0.5)
+                        gaussians.decay_opacity(0.002)
 
                         ##디버깅용용
                         if iteration%100==0:
@@ -181,7 +181,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                 if bug_count > 0:
                                     print(f"[WARN][ITER {iteration}] _opa_remove=True인데 아직 opacity>{remove_tres}인 가우시안 {bug_count}개 있음")
                         if (iteration==base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-                            
+                            gaussians._opa_remove[:] = False
+
 
 
                         #####################

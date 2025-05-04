@@ -118,10 +118,10 @@ class GaussianModel:
         return self.opacity_activation(self._opacity)
     
     ##########################################
-    def decay_opacity(self, factor=0.5):
+    def decay_opacity(self, factor=0.002):
         with torch.no_grad():
             mask = self._opa_remove.view(-1)
-            self._opacity[mask] *= factor
+            self._opacity[mask] -= factor
     #########################################
 
     def get_covariance(self, scaling_modifier = 1):
