@@ -156,7 +156,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
                         prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                        print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
                         gaussians.prune_points(prune_mask)
                     #######################
 
@@ -166,11 +166,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
                         prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
                     elif any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-                        gaussians.decay_opacity(0.995)
+                        gaussians.decay_opacity(0.5)
 
                         ##디버깅용용
                         if iteration%100==0:
@@ -180,6 +180,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                 bug_count = condition.sum().item()
                                 if bug_count > 0:
                                     print(f"[WARN][ITER {iteration}] _opa_remove=True인데 아직 opacity>{remove_tres}인 가우시안 {bug_count}개 있음")
+                        if (iteration==base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+                            
 
 
                         #####################
