@@ -27,8 +27,35 @@ try:
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
+import random
+import numpy as np
+import torch
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+
+
+def seed_all(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # (선택) PyTorch 1.11 이상에서 완전한 결정론 보장
+    try:
+        torch.use_deterministic_algorithms(True)
+    except:
+        pass
+
+
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
+             mode, remove_start_iter, remove_tres):
+    ##############
+    seed_all(42)  # ← 여기에 고정!
+    ##############
+
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
@@ -121,12 +148,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                     ######################
-                if iteration in [10000, 20000]:
-                    raw_opacity = gaussians._opacity.detach()
-                    sigmoid_opacity = torch.sigmoid(raw_opacity)
-                    prune_mask = (sigmoid_opacity < 0.1).squeeze()
-                    print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
-                    gaussians.prune_points(prune_mask)
+                if mode==1:
+                    if iteration in remove_start_iter:
+                        raw_opacity = gaussians._opacity.detach()
+                        sigmoid_opacity = torch.sigmoid(raw_opacity)
+                        prune_mask = (sigmoid_opacity < remove_tres).squeeze()
+                        print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                        gaussians.prune_points(prune_mask)
                     #######################
 
 
@@ -207,17 +235,29 @@ if __name__ == "__main__":
     lp = ModelParams(parser)
     op = OptimizationParams(parser)
     pp = PipelineParams(parser)
+
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,9999,10001,15000,19999,20001,25000,30_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000,9999,10001,15000,19999,20001,25000,30_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,30_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000,30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     args = parser.parse_args(sys.argv[1:])
     args.save_iterations.append(args.iterations)
+
+    ################################
+        # 세 가지 인자 추가
+    parser.add_argument("--mode", type=int, default=0,
+                        help="0: 기본, 1: 완전 삭제, 2: 서서히 삭제")
+    parser.add_argument("--remove_start_iter", type=int, nargs='+', default=[7000, 12000],
+                        help="삭제 시작 iteration 리스트")
+    parser.add_argument("--remove_tres", type=float, default=0.1,
+                        help="opacity pruning threshold")
+    ###################################
+
     
     print("Optimizing " + args.model_path)
 
@@ -227,7 +267,10 @@ if __name__ == "__main__":
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
-    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from,
+         mode=args.mode,
+         remove_start_iter=args.remove_start_iter,
+         remove_tres=args.remove_tres)
 
     # All done
     print("\nTraining complete.")
