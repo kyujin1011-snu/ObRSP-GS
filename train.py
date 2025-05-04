@@ -170,18 +170,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
                     elif any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-
                         gaussians.decay_opacity(0.995)
 
-                        # 만약 너무 작아진 것 prune하고 싶다면 추가로:
+                        ##디버깅용용
                         if iteration%100==0:
-                            prune_mask = torch.logical_and(gaussians._opa_remove.view(-1), torch.sigmoid(gaussians._opacity.view(-1)) < 0.005)
+                            with torch.no_grad():
+                                sigmoid_opacity = torch.sigmoid(gaussians._opacity.view(-1))
+                                condition = torch.logical_and(gaussians._opa_remove.view(-1), sigmoid_opacity > remove_tres)
+                                bug_count = condition.sum().item()
+                                if bug_count > 0:
+                                    print(f"[WARN][ITER {iteration}] _opa_remove=True인데 아직 opacity>{remove_tres}인 가우시안 {bug_count}개 있음")
 
-                            gaussians.prune_points(prune_mask)
-                        
 
-
-                        #차근차근 줄이기기
                         #####################
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
