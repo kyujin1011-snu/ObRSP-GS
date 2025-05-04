@@ -99,6 +99,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.update(10)
             if iteration == opt.iterations:
                 progress_bar.close()
+            if iteration in [10000, 20000]:
+                raw_opacity = gaussians._opacity.detach()
+                sigmoid_opacity = torch.sigmoid(raw_opacity)
+                prune_mask = (sigmoid_opacity < 0.1).squeeze()
+                print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                gaussians.prune_points(prune_mask)
 
             # Log and save
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
@@ -197,8 +203,8 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 30_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 30_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,9999,10001,15000,19999,20001,25000,30_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000,9999,10001,15000,19999,20001,25000,30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
