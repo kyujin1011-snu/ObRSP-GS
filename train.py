@@ -59,6 +59,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
+    #############################################################
+    num_train_imgs = len(scene.getTrainCameras())
+    ###############################################################
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
         gaussians.restore(model_params, opt)
@@ -116,6 +119,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         iter_end.record()
 
+
+
         with torch.no_grad():
             # Progress bar
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
@@ -146,7 +151,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                     ######################
-                if mode==1:
+                if mode==1: #한번에 삭제 빡빡
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
@@ -155,6 +160,29 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         gaussians.prune_points(prune_mask)
                     #######################
 
+
+                elif mode==2: #여러번에 걸쳐서 삭제.
+                    if iteration in remove_start_iter:
+                        raw_opacity = gaussians._opacity.detach()
+                        sigmoid_opacity = torch.sigmoid(raw_opacity)
+                        prune_mask = (sigmoid_opacity < remove_tres).squeeze()
+                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                        #true로 바꿔주기기
+                        gaussians._opa_remove[prune_mask] = True
+                    elif any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+
+                        gaussians.decay_opacity(0.995)
+
+                        # 만약 너무 작아진 것 prune하고 싶다면 추가로:
+                        if iteration%100==0:
+                            prune_mask = torch.logical_and(gaussians._opa_remove.view(-1), torch.sigmoid(gaussians._opacity.view(-1)) < 0.005)
+
+                            gaussians.prune_points(prune_mask)
+                        
+
+
+                        #차근차근 줄이기기
+                        #####################
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
