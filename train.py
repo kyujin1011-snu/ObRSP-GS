@@ -99,12 +99,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 progress_bar.update(10)
             if iteration == opt.iterations:
                 progress_bar.close()
-            if iteration in [10000, 20000]:
-                raw_opacity = gaussians._opacity.detach()
-                sigmoid_opacity = torch.sigmoid(raw_opacity)
-                prune_mask = (sigmoid_opacity < 0.1).squeeze()
-                print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
-                gaussians.prune_points(prune_mask)
+
+
+
 
             # Log and save
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
@@ -121,7 +118,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
-                
+
+
+                    ######################
+                if iteration in [10000, 20000]:
+                    raw_opacity = gaussians._opacity.detach()
+                    sigmoid_opacity = torch.sigmoid(raw_opacity)
+                    prune_mask = (sigmoid_opacity < 0.1).squeeze()
+                    print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < 0.1")
+                    gaussians.prune_points(prune_mask)
+                    #######################
+
+
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
