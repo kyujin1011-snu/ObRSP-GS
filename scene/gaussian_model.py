@@ -118,7 +118,7 @@ class GaussianModel:
         return self.opacity_activation(self._opacity)
     
     ##########################################
-    def decay_opacity(self, factor=0.002):
+    def decay_opacity(self, factor=0.3):
         with torch.no_grad():
             mask = self._opa_remove.view(-1)
             self._opacity[mask] -= factor
@@ -333,7 +333,7 @@ class GaussianModel:
                 stored_state["exp_avg_sq"] = torch.cat((stored_state["exp_avg_sq"], torch.zeros_like(extension_tensor)), dim=0)
 
                 del self.optimizer.state[group['params'][0]]
-                group["params"][0] = nn.Parameter(torch.cat((group["params"][0], extension_tensor), dim=0).requires_grad_(True))
+                group["params"][0] = nn.Parameter(torch.cat((group["params"][0], extension_tensor), dim=0).requir    es_grad_(True))
                 self.optimizer.state[group['params'][0]] = stored_state
 
                 optimizable_tensors[group["name"]] = group["params"][0]

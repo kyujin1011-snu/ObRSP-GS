@@ -169,19 +169,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
-                    elif any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-                        gaussians.decay_opacity(0.002)
+                    if iteration%100==0:
+                        if any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+                        
+                            gaussians.decay_opacity(0.5)
 
-                        ##디버깅용용
-                        if iteration%100==0:
-                            with torch.no_grad():
-                                sigmoid_opacity = torch.sigmoid(gaussians._opacity.view(-1))
-                                condition = torch.logical_and(gaussians._opa_remove.view(-1), sigmoid_opacity > remove_tres)
-                                bug_count = condition.sum().item()
-                                if bug_count > 0:
-                                    print(f"[WARN][ITER {iteration}] _opa_remove=True인데 아직 opacity>{remove_tres}인 가우시안 {bug_count}개 있음")
-                        if (iteration==base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
-                            gaussians._opa_remove[:] = False
+                    if any(iteration==base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+                        gaussians._opa_remove[:] = False
+                    
+                    #디버깅깅
+                    if iteration%1000==0:
+                        if len(gaussians._opa_remove)!=len(gaussians._opacity):
+                            print("*******개수다름**********")
+                        print(f"{iteration}에서 True 개수{gaussians._opa_remove.sum().item()}")
 
 
 
