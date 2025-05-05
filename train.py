@@ -117,6 +117,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
+        ############################
+        # gradient 막기
+        if mode==2 and any(base_iter < iteration <= base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
+            with torch.no_grad():
+                mask = gaussians._opa_remove.view(-1)
+                if gaussians._opacity.grad is not None:
+                    gaussians._opacity.grad[mask] = 0.0
+            # 2. optimizer 상태도 0으로 클리어
+            param = gaussians._opacity
+            if param in gaussians.optimizer.state:
+                state = gaussians.optimizer.state[param]
+                state["exp_avg"][mask] = 0.0
+                state["exp_avg_sq"][mask] = 0.0
+        ###############################
+
         iter_end.record()
 
 
@@ -169,12 +184,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
-                    if iteration%100==0:
-                        if any(base_iter < iteration <= base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+                    if iteration%50==0:
+                        if any(base_iter < iteration <= base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
                         
                             gaussians.decay_opacity(0.5)
 
-                    if any(iteration==base_iter + num_train_imgs * 5 for base_iter in remove_start_iter):
+                    if any(iteration==base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
                         gaussians._opa_remove[:] = False
                     
                     #디버깅깅
