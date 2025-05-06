@@ -184,10 +184,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
                         #true로 바꿔주기기
                         gaussians._opa_remove[prune_mask] = True
-                    if iteration%50==0:
+                    if iteration%10==0:
                         if any(base_iter < iteration <= base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
                         
-                            gaussians.decay_opacity(0.5)
+                            gaussians.decay_opacity(0.05)
 
                     if any(iteration==base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
                         gaussians._opa_remove[:] = False
