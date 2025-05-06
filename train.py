@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres):
+             mode, remove_start_iter, remove_tres, prob):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -171,8 +171,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
                         prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        print(f"\n[ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
-                        gaussians.prune_points(prune_mask)
+                        random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+
+                        print(f"\n[ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres}")
+                        gaussians.prune_points(final_mask)
                     #######################
 
 
@@ -181,8 +184,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
                         prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        # 80% 확률로 True 설정
-                        random_mask = torch.rand_like(prune_mask.float()) < 0.8  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        # prob 확률로 True 설정
+                        random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} (80% 확률)")
@@ -305,6 +308,8 @@ if __name__ == "__main__":
                         help="삭제 시작 iteration 리스트")
     parser.add_argument("--remove_tres", type=float, default=0.1,
                         help="opacity pruning threshold")
+    parser.add_argument("--prob", type=float, default=0.8,
+                        help="pruning probability")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -322,7 +327,9 @@ if __name__ == "__main__":
     training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from,
          mode=args.mode,
          remove_start_iter=args.remove_start_iter,
-         remove_tres=args.remove_tres)
+         remove_tres=args.remove_tres,
+         prob=args.prob
+         )
 
     # All done
     print("\nTraining complete.")
