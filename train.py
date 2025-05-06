@@ -119,7 +119,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         ############################
         # gradient 막기
-        if mode==2 and any(base_iter < iteration <= base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
+        if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
             with torch.no_grad():
                 mask = gaussians._opa_remove.view(-1)
                 if gaussians._opacity.grad is not None:
@@ -181,17 +181,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
                         prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity < {remove_tres}")
-                        #true로 바꿔주기기
-                        gaussians._opa_remove[prune_mask] = True
+                        # 80% 확률로 True 설정
+                        random_mask = torch.rand_like(prune_mask.float()) < 0.8  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+
+                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} (80% 확률)")
+
+                        gaussians._opa_remove[final_mask] = True
                     if iteration%10==0:
-                        if any(base_iter < iteration <= base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
+                        if any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
                         
                             gaussians.decay_opacity(0.05)
 
-                    if any(iteration==base_iter + num_train_imgs * 3 for base_iter in remove_start_iter):
+                    if any(iteration==base_iter + 1000 for base_iter in remove_start_iter):
                         gaussians._opa_remove[:] = False
-                    
+                    '''
                     #디버깅깅
                     if iteration%1000==0:
                         if len(gaussians._opa_remove)!=len(gaussians._opacity):
@@ -201,7 +205,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                         #####################
-
+                    '''
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
@@ -287,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,30_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,15_000,30_000])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000,30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
