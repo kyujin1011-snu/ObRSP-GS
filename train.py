@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob):
+             mode, remove_start_iter, remove_tres, prob,remove_by_gradient):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -165,7 +165,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
 
 
-                    ######################
+                    ###################################MODE1##################################################
                 if mode==1: #한번에 삭제 빡빡
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
@@ -174,11 +174,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                        print(f"\n[ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres}")
+                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
                         gaussians.prune_points(final_mask)
-                    #######################
+                    ###########################################################################################
 
 
+                ###################################MODE2#################################################
                 elif mode==2: #여러번에 걸쳐서 삭제.
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
@@ -188,7 +189,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} (80% 확률)")
+                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
 
                         gaussians._opa_remove[final_mask] = True
                     if iteration%10==0:
@@ -209,6 +210,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         #####################
                     '''
+                ###########################################################################################
+
+                ################################grad_remover#################################
+                if remove_by_gradient==True and iteration>=7000 and iteration<8000:
+                    non_zero_mask = (gaussians._opacity.grad != 0).squeeze()
+                    gaussians._opa_grad_count[non_zero_mask] += 1
+                if iteration==8000:
+                    count_zero = (gaussians._opa_grad_count == 0).sum().item()
+                    count_nonzero = (gaussians._opa_grad_count != 0).sum().item()
+                    print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
+
+
+
+
+
+
+
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
@@ -310,6 +328,8 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
+    parser.add_argument("--remove_by_gradient", type=bool, default=False,
+                        help="remove by gradeint")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -329,6 +349,7 @@ if __name__ == "__main__":
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
          prob=args.prob
+         remove_by_gradient=args.remove_by_gradient
          )
 
     # All done
