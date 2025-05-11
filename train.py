@@ -213,7 +213,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 ###########################################################################################
 
                 ################################grad_remover#################################
-                if remove_by_gradient==True and iteration>=7000 and iteration<8000:
+                if remove_by_gradient==1 and iteration>=7000 and iteration<8000:
                     non_zero_mask = (gaussians._opacity.grad != 0).squeeze()
                     gaussians._opa_grad_count[non_zero_mask] += 1
                 if iteration==8000:
@@ -328,7 +328,7 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
-    parser.add_argument("--remove_by_gradient", type=bool, default=False,
+    parser.add_argument("--remove_by_gradient", type=int, default=0,
                         help="remove by gradeint")
     ###################################
 
