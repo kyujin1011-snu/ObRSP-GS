@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob,remove_by_gradient):
+             mode, remove_start_iter, remove_tres, prob,only_opacity):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -117,6 +117,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
+        '''
         #########################################################################
         if remove_by_gradient==1 and iteration>=7000 and iteration<8000:
             
@@ -130,7 +131,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             count_nonzero = (gaussians._opa_grad_count != 1000).sum().item()
             print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
             #################################################################
+        '''
+        
 
+         
         ############################
         # gradient 막기
         if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
@@ -145,6 +149,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 state["exp_avg"][mask] = 0.0
                 state["exp_avg_sq"][mask] = 0.0
         ###############################
+
+        ##############################
+        if only_opacity==1 and ((6000 <= iteration < 7000) or(9000 <= iteration < 10000) or(12000 <= iteration < 13000)):
+            with torch.no_grad():
+                gaussians._xyz.grad.zero_()
+                gaussians._features_dc.grad.zero_()
+                gaussians._features_rest.grad.zero_()
+                gaussians._scaling.grad.zero_()
+                gaussians._rotation.grad.zero_()
+        ##############################
 
         iter_end.record()
 
@@ -333,8 +347,8 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
-    parser.add_argument("--remove_by_gradient", type=int, default=0,
-                        help="remove by gradeint")
+    parser.add_argument("--only_opacity", type=int, default=0,
+                        help="only opacity update after reset opacity")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -354,7 +368,7 @@ if __name__ == "__main__":
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
          prob=args.prob,
-         remove_by_gradient=args.remove_by_gradient
+         only_opacity=args.only_opacity
          )
 
     # All done
