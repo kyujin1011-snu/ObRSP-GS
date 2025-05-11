@@ -117,6 +117,20 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
+        #########################################################################
+        if remove_by_gradient==1 and iteration>=7000 and iteration<8000:
+            
+            non_zero_mask = (gaussians._opacity.grad == 0).squeeze()
+            gaussians._opa_grad_count[non_zero_mask] += 1
+
+
+        if iteration==8000:
+            
+            count_zero = (gaussians._opa_grad_count == 1000).sum().item()
+            count_nonzero = (gaussians._opa_grad_count != 1000).sum().item()
+            print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
+            #################################################################
+
         ############################
         # gradient 막기
         if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
@@ -211,15 +225,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         #####################
                     '''
                 ###########################################################################################
-
-                ################################grad_remover#################################
-                if remove_by_gradient==1 and iteration>=7000 and iteration<8000:
-                    non_zero_mask = (gaussians._opacity.grad != 0).squeeze()
-                    gaussians._opa_grad_count[non_zero_mask] += 1
-                if iteration==8000:
-                    count_zero = (gaussians._opa_grad_count == 0).sum().item()
-                    count_nonzero = (gaussians._opa_grad_count != 0).sum().item()
-                    print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
 
 
 
@@ -348,7 +353,7 @@ if __name__ == "__main__":
          mode=args.mode,
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
-         prob=args.prob
+         prob=args.prob,
          remove_by_gradient=args.remove_by_gradient
          )
 
