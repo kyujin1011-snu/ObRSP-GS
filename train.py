@@ -249,6 +249,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         #####################
                     '''
+<<<<<<< HEAD
                 if graph==1 and (iteration % 1000 == 0):
                     import matplotlib.pyplot as plt
                     import os
@@ -280,6 +281,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
 
+=======
+                
+>>>>>>> 782de59 (다시 다 포기하고 회귀)
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
@@ -291,6 +295,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+
+            if (iteration % 1000 == 0):
+                
+                # sigmoid 적용
+                sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
+
+                # 구간별 카운트
+                bins = [0] * 10
+                for val in sigmoid_opacity:
+                    idx = min(int(val * 10), 9)  # 0.0~0.999는 0~9, 1.0은 9
+                    bins[idx] += 1
+
+                # 리스트만 출력
+                print(f"\n{iteration}_______")
+                print(bins)
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
