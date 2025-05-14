@@ -52,7 +52,8 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob,only_opacity):
+             mode, remove_start_iter, remove_tres, prob,
+             opacity_loss,opacity_loss_const,graph ):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -106,15 +107,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
         # Render
-        if (iteration - 1) == debug_from:
+        if (iteration - 1) == debug_from:  #debug_from은 -1로 큰 영향 X
             pipe.debug = True
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background)  #backgraound도 별로 안중요한듯듯
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        if opacity_loss==1:
+            # opacity loss 추가
+            sigmoid_opacity = torch.sigmoid(gaussians._opacity)
+            lower_mask = sigmoid_opacity < 0.5
+            upper_mask = ~lower_mask
+            loss_opacity = torch.zeros_like(sigmoid_opacity)
+            loss_opacity[lower_mask] = -sigmoid_opacity[lower_mask] ** 2 + sigmoid_opacity[lower_mask]
+            loss_opacity[upper_mask] = 0.25
+            loss += opacity_loss_const * loss_opacity.mean()
+        
         loss.backward()
 
         '''
@@ -150,7 +161,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 state["exp_avg_sq"][mask] = 0.0
         ###############################
 
-        ##############################
+        '''##############################
         if only_opacity==1 and ((6000 <= iteration < 7000) or(9000 <= iteration < 10000) or(12000 <= iteration < 13000)):
             with torch.no_grad():
                 gaussians._xyz.grad.zero_()
@@ -158,7 +169,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians._features_rest.grad.zero_()
                 gaussians._scaling.grad.zero_()
                 gaussians._rotation.grad.zero_()
-        ##############################
+        ##############################'''
 
         iter_end.record()
 
@@ -238,6 +249,29 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         #####################
                     '''
+                if graph==1 and (iteration % 1000 == 0):
+                    import matplotlib.pyplot as plt
+                    import os
+
+                    # sigmoid 값으로 변환
+                    sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy()
+
+                    # 그래프 저장 경로 생성
+                    graph_dir = os.path.join(dataset.model_path, "opacity_graphs")
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    # 히스토그램 그리기
+                    plt.figure(figsize=(6, 4))
+                    plt.hist(sigmoid_opacity, bins=50, color='blue', alpha=0.7)
+                    plt.title(f"Opacity Histogram at Iteration {iteration}")
+                    plt.xlabel("Sigmoid(Opacity)")
+                    plt.ylabel("Frequency")
+                    plt.grid(True)
+
+                    # 저장
+                    plt.savefig(os.path.join(graph_dir, f"opacity_iter{iteration}.png"))
+                    plt.close()
+
                 ###########################################################################################
 
 
@@ -347,8 +381,12 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
-    parser.add_argument("--only_opacity", type=int, default=0,
-                        help="only opacity update after reset opacity")
+    parser.add_argument("--opacity_loss", type=int, default=0,
+                        help="new loss, True False 1 0")
+    parser.add_argument("--opacity_loss_const", type=float, default=0.001,
+                        help="new loss, const")
+    parser.add_argument("--graph", type =int, default=0, 
+                        help="graph true false")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -368,7 +406,9 @@ if __name__ == "__main__":
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
          prob=args.prob,
-         only_opacity=args.only_opacity
+         opacity_loss=args.opacity_loss,
+         opacity_loss_const=args.opacity_loss_const,
+         graph=args.graph 
          )
 
     # All done
