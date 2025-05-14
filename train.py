@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob,remove_by_gradient):
+             mode, remove_start_iter, remove_tres, prob):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -106,17 +106,36 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
         # Render
-        if (iteration - 1) == debug_from:
+        if (iteration - 1) == debug_from:  #debug_from은 -1로 큰 영향 X
             pipe.debug = True
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background)  #backgraound도 별로 안중요한듯듯
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        
         loss.backward()
 
+        '''
+        #########################################################################
+        if remove_by_gradient==1 and iteration>=7000 and iteration<8000:
+            
+            non_zero_mask = (gaussians._opacity.grad == 0).squeeze()
+            gaussians._opa_grad_count[non_zero_mask] += 1
+
+
+        if iteration==8000:
+            
+            count_zero = (gaussians._opa_grad_count == 1000).sum().item()
+            count_nonzero = (gaussians._opa_grad_count != 1000).sum().item()
+            print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
+            #################################################################
+        '''
+        
+
+         
         ############################
         # gradient 막기
         if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
@@ -131,6 +150,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 state["exp_avg"][mask] = 0.0
                 state["exp_avg_sq"][mask] = 0.0
         ###############################
+
+        '''##############################
+        if only_opacity==1 and ((6000 <= iteration < 7000) or(9000 <= iteration < 10000) or(12000 <= iteration < 13000)):
+            with torch.no_grad():
+                gaussians._xyz.grad.zero_()
+                gaussians._features_dc.grad.zero_()
+                gaussians._features_rest.grad.zero_()
+                gaussians._scaling.grad.zero_()
+                gaussians._rotation.grad.zero_()
+        ##############################'''
 
         iter_end.record()
 
@@ -210,16 +239,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         #####################
                     '''
+
+                if (iteration % 1000 == 0):
+                    # sigmoid 적용
+                    sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
+
+                    # 구간별 카운트
+                    bins = [0] * 10
+                    for val in sigmoid_opacity:
+                        idx = min(int(val * 10), 9)  # 0.0~0.999는 0~9, 1.0은 9
+                        bins[idx] += 1
+
+                    # 리스트만 출력
+                    print(f"\n{iteration}_______")
+                    print(bins)
+
                 ###########################################################################################
 
-                ################################grad_remover#################################
-                if remove_by_gradient==True and iteration>=7000 and iteration<8000:
-                    non_zero_mask = (gaussians._opacity.grad != 0).squeeze()
-                    gaussians._opa_grad_count[non_zero_mask] += 1
-                if iteration==8000:
-                    count_zero = (gaussians._opa_grad_count == 0).sum().item()
-                    count_nonzero = (gaussians._opa_grad_count != 0).sum().item()
-                    print(f"[ITER {iteration}] grad==0인 개수: {count_zero}, grad!=0인 개수: {count_nonzero}")
 
 
 
@@ -238,6 +274,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+
+            if (iteration % 1000 == 0):
+                
+                # sigmoid 적용
+                sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
+
+                # 구간별 카운트
+                bins = [0] * 10
+                for val in sigmoid_opacity:
+                    idx = min(int(val * 10), 9)  # 0.0~0.999는 0~9, 1.0은 9
+                    bins[idx] += 1
+
+                # 리스트만 출력
+                print(f"\n{iteration}_______")
+                print(bins)
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
@@ -328,8 +379,6 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
-    parser.add_argument("--remove_by_gradient", type=bool, default=False,
-                        help="remove by gradeint")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -348,8 +397,7 @@ if __name__ == "__main__":
          mode=args.mode,
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
-         prob=args.prob
-         remove_by_gradient=args.remove_by_gradient
+         prob=args.prob,
          )
 
     # All done
