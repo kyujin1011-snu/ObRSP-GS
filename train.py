@@ -298,7 +298,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 # 2. source별 합/카운트 저장  
                 for s, o in zip(source, opacity):
                     if o < 0.5:
-                        num_low_opacities[s] += o
+                        num_low_opacities[s] += 1
                     count_opacities[s] += 1
 
                 # 3. 평균 계산 (0으로 나누지 않도록 방지)
@@ -442,7 +442,7 @@ if __name__ == "__main__":
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
          prob=args.prob,
-         afterremove=args.afterremove
+         afterremove=args.afterremove,
          sourceremove=args.sourceremove
          )
 
