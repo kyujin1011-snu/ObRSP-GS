@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob):
+             mode, remove_start_iter, remove_tres, prob, afterremove):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -240,27 +240,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         #####################
                     '''
 
-                if (iteration % 1000 == 0):
-                    # sigmoid 적용
-                    sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
-
-                    # 구간별 카운트
-                    bins = [0] * 10
-                    for val in sigmoid_opacity:
-                        idx = min(int(val * 10), 9)  # 0.0~0.999는 0~9, 1.0은 9
-                        bins[idx] += 1
-
-                    # 리스트만 출력
-                    print(f"\n{iteration}_______")
-                    print(bins)
-
                 ###########################################################################################
-
-
-
-
-
-
 
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
@@ -275,6 +255,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
+
+            if iteration%3000==0 and opt.densify_until_iter<iteration<opt.iterations*0.9:
+                raw_opacity = gaussians._opacity.detach()
+                sigmoid_opacity = torch.sigmoid(raw_opacity)
+                prune_mask = (sigmoid_opacity < 0.2).squeeze()
+                random_mask = torch.rand_like(prune_mask.float()) < 0.8  # 같은 shape의 0~1 uniform 랜덤값 생성
+                final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+
+                print(f"\n확확확 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.1} ({prob} 확률)")
+                gaussians.prune_points(final_mask)                
+
+            ###################bin 출력##########################
             if (iteration % 1000 == 0):
                 
                 # sigmoid 적용
@@ -289,6 +281,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 # 리스트만 출력
                 print(f"\n{iteration}_______")
                 print(bins)
+                #########################################
+
+
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
@@ -379,6 +374,8 @@ if __name__ == "__main__":
                         help="opacity pruning threshold")
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
+    parser.add_argument("--afterremove", type=int, default=0,
+                        help="pruning probability")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -398,6 +395,7 @@ if __name__ == "__main__":
          remove_start_iter=args.remove_start_iter,
          remove_tres=args.remove_tres,
          prob=args.prob,
+         afterremove=args.afterremove
          )
 
     # All done
