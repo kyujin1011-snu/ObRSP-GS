@@ -52,7 +52,7 @@ def seed_all(seed=42):
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob, afterremove):
+             mode, remove_start_iter, remove_tres, prob, afterremove, sourceremove):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -283,7 +283,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print(bins)
                 #########################################
             
-            if (iteration==15000 or iteration==30000):
+            if sourceremove==1 and (iteration==8000):
                 print(f"\n[ITER {iteration}] _source별 평균 opacity 분포 분석")
 
                 # 1. 데이터 준비
@@ -291,22 +291,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 source = gaussians._source.detach().cpu().numpy().flatten()
 
                 max_source = source.max() + 1  # 최대 source ID에 맞춰 크기 잡기
-                sum_opacities = np.zeros(max_source, dtype=np.float32)
+                print(f"max source 숫자 init 과 비슷해야함{max_source}")
+                num_low_opacities = np.zeros(max_source, dtype=np.float32)
                 count_opacities = np.zeros(max_source, dtype=np.int32)
 
-                # 2. source별 합/카운트 저장
+                # 2. source별 합/카운트 저장  
                 for s, o in zip(source, opacity):
-                    sum_opacities[s] += o
+                    if o < 0.5:
+                        num_low_opacities[s] += o
                     count_opacities[s] += 1
 
                 # 3. 평균 계산 (0으로 나누지 않도록 방지)
+
                 valid_mask = count_opacities > 0
-                source_avg_opacities = np.zeros_like(sum_opacities)
-                source_avg_opacities[valid_mask] = sum_opacities[valid_mask] / count_opacities[valid_mask]
+                source_low_opacities_per = np.zeros_like(num_low_opacities)
+                source_low_opacities_per[valid_mask] = num_low_opacities[valid_mask] / count_opacities[valid_mask]
 
                 # 4. binning
                 bins = [0] * 10
-                for avg in source_avg_opacities[valid_mask]:  # 0개짜리 제외
+                for avg in source_low_opacities_per[valid_mask]:  # 0개짜리 제외
                     idx = min(int(avg * 10), 9)
                     bins[idx] += 1
 
@@ -315,6 +318,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("0.0~0.1, 0.1~0.2, ..., 0.9~1.0 bin 개수:")
                 print(bins)
 
+
+                # 3. 0.9이상애들 지우기 source ID들 추출
+                low_opacity_sources = np.where(source_low_opacities_per > 0.9)[0]
+
+                # 4. 현재 가우시안 중 해당 source를 갖는 애들 골라서 마스크 생성
+                prune_mask_np = np.isin(source, low_opacity_sources)
+                prune_mask = torch.from_numpy(prune_mask_np).to(gaussians._opacity.device)
+
+                print(f"\n[ITER {iteration}] 0.9비율 이상인 인 source를 갖는 가우시안 {prune_mask.sum().item()}개 삭제")
+                gaussians.prune_points(prune_mask)
 
 
 def prepare_output_and_logger(args):    
@@ -407,7 +420,9 @@ if __name__ == "__main__":
     parser.add_argument("--prob", type=float, default=0.8,
                         help="pruning probability")
     parser.add_argument("--afterremove", type=int, default=0,
-                        help="pruning probability")
+                        help="")
+    parser.add_argument("--sourceremove", type=int, default=0,
+                        help="")
     ###################################
 
     args = parser.parse_args(sys.argv[1:])
@@ -428,6 +443,7 @@ if __name__ == "__main__":
          remove_tres=args.remove_tres,
          prob=args.prob,
          afterremove=args.afterremove
+         sourceremove=args.sourceremove
          )
 
     # All done
