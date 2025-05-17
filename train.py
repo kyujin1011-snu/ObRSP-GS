@@ -256,7 +256,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
 
-            if iteration%3000==0 and opt.densify_until_iter<iteration<opt.iterations*0.9:
+            if afterremove==1 and iteration%3000==0 and opt.densify_until_iter<iteration<opt.iterations*0.9:
                 raw_opacity = gaussians._opacity.detach()
                 sigmoid_opacity = torch.sigmoid(raw_opacity)
                 prune_mask = (sigmoid_opacity < 0.2).squeeze()
@@ -282,6 +282,38 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print(f"\n{iteration}_______")
                 print(bins)
                 #########################################
+            
+            if (iteration==15000 or iteration==30000):
+                print(f"\n[ITER {iteration}] _source별 평균 opacity 분포 분석")
+
+                # 1. 데이터 준비
+                opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
+                source = gaussians._source.detach().cpu().numpy().flatten()
+
+                max_source = source.max() + 1  # 최대 source ID에 맞춰 크기 잡기
+                sum_opacities = np.zeros(max_source, dtype=np.float32)
+                count_opacities = np.zeros(max_source, dtype=np.int32)
+
+                # 2. source별 합/카운트 저장
+                for s, o in zip(source, opacity):
+                    sum_opacities[s] += o
+                    count_opacities[s] += 1
+
+                # 3. 평균 계산 (0으로 나누지 않도록 방지)
+                valid_mask = count_opacities > 0
+                source_avg_opacities = np.zeros_like(sum_opacities)
+                source_avg_opacities[valid_mask] = sum_opacities[valid_mask] / count_opacities[valid_mask]
+
+                # 4. binning
+                bins = [0] * 10
+                for avg in source_avg_opacities[valid_mask]:  # 0개짜리 제외
+                    idx = min(int(avg * 10), 9)
+                    bins[idx] += 1
+
+                # 5. 출력
+                print("source group 수:", valid_mask.sum())
+                print("0.0~0.1, 0.1~0.2, ..., 0.9~1.0 bin 개수:")
+                print(bins)
 
 
 

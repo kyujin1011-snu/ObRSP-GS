@@ -55,7 +55,8 @@ class GaussianModel:
         self.denom = torch.empty(0)
         #########################
         self._opa_remove = torch.empty(0, dtype=torch.bool)
-        self._opa_grad_count = torch.empty(0, dtype=torch.int)
+        self._source = torch.empty(0, dtype=torch.int)
+        #self._opa_grad_count = torch.empty(0, dtype=torch.int)
         #########################
         self.optimizer = None
         self.percent_dense = 0
@@ -158,8 +159,9 @@ class GaussianModel:
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
         #################################
-        self._opa_remove = torch.zeros((fused_point_cloud.shape[0], 1), dtype=torch.bool, device="cuda")
-        self._opa_grad_count=torch.zeros((fused_point_cloud.shape[0], 1), dtype=torch.int, device="cuda")
+        self._opa_remove = torch.zeros((fused_point_cloud.shape[0], 1), dtype=torch.bool)
+        self._source = torch.arange(fused_point_cloud.shape[0], dtype=torch.int)
+        #self._opa_grad_count=torch.zeros((fused_point_cloud.shape[0], 1), dtype=torch.int, device="cuda")
         #################################
 
 
@@ -319,7 +321,8 @@ class GaussianModel:
 
         #######################
         self._opa_remove = self._opa_remove[valid_points_mask]
-        self._opa_grad_count = self._opa_grad_count[valid_points_mask]
+        self._source = self._source[valid_points_mask]
+        #self._opa_grad_count = self._opa_grad_count[valid_points_mask]
         ######################
 
         self.xyz_gradient_accum = self.xyz_gradient_accum[valid_points_mask]
@@ -366,11 +369,11 @@ class GaussianModel:
         self._rotation = optimizable_tensors["rotation"]
         
         ################ 🔥 ← 요기 추가: opa_remove도 False로 확장
-        new_opa_remove = torch.zeros((new_xyz.shape[0], 1), dtype=torch.bool, device="cuda")
+        new_opa_remove = torch.zeros((new_xyz.shape[0], 1), dtype=torch.bool)
         self._opa_remove = torch.cat((self._opa_remove, new_opa_remove), dim=0)
 
-        new_opa_grad_count = torch.zeros((new_xyz.shape[0], 1), dtype=torch.int, device="cuda")
-        self._opa_grad_count = torch.cat((self._opa_grad_count, new_opa_grad_count), dim=0)
+        #new_opa_grad_count = torch.zeros((new_xyz.shape[0], 1), dtype=torch.int, device="cuda")
+        #self._opa_grad_count = torch.cat((self._opa_grad_count, new_opa_grad_count), dim=0)
         #################
 
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
@@ -399,6 +402,12 @@ class GaussianModel:
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation)
 
+        #################################################################################################################
+        new_source = self._source[selected_pts_mask].repeat(N)
+        self._source = torch.cat((self._source, new_source), dim=0)
+        #################################################################################################################
+
+
         prune_filter = torch.cat((selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
         self.prune_points(prune_filter)
 
@@ -416,6 +425,11 @@ class GaussianModel:
         new_rotation = self._rotation[selected_pts_mask]
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation)
+
+        #######################################################
+        new_source = self._source[selected_pts_mask].clone()
+        self._source = torch.cat((self._source, new_source), dim=0)
+        ########################################################
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         grads = self.xyz_gradient_accum / self.denom
