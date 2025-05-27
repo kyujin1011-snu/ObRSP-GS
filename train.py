@@ -256,15 +256,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
 
-            if afterremove==1 and iteration%3000==0 and opt.densify_until_iter<iteration<opt.iterations*0.9:
+            if afterremove==1 and iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
                 raw_opacity = gaussians._opacity.detach()
                 sigmoid_opacity = torch.sigmoid(raw_opacity)
-                prune_mask = (sigmoid_opacity < 0.2).squeeze()
-                random_mask = torch.rand_like(prune_mask.float()) < 0.8  # 같은 shape의 0~1 uniform 랜덤값 생성
+                prune_mask = (sigmoid_opacity < 0.5).squeeze()
+                random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
                 final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                 print(f"\n확확확 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.1} ({prob} 확률)")
-                gaussians.prune_points(final_mask)                
+                gaussians.prune_points(final_mask)      
+
+            if afterremove==1 and 15000<iteration and iteration%1000==0 and iteration<26000:
+                raw_opacity = gaussians._opacity.detach()
+                sigmoid_opacity = torch.sigmoid(raw_opacity)
+                prune_mask = (sigmoid_opacity < 0.01).squeeze()
+
+                print(f"\n확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.03삭제")
+                gaussians.prune_points(prune_mask)
 
             ###################bin 출력##########################
             if (iteration % 1000 == 0):
@@ -282,7 +290,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print(f"\n{iteration}_______")
                 print(bins)
                 #########################################
-            
+            '''
             if sourceremove==1 and (iteration==8000):
                 print(f"\n[ITER {iteration}] _source별 평균 opacity 분포 분석")
 
@@ -328,7 +336,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 print(f"\n[ITER {iteration}] 0.9비율 이상인 인 source를 갖는 가우시안 {prune_mask.sum().item()}개 삭제")
                 gaussians.prune_points(prune_mask)
-
+'''
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
