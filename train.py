@@ -32,7 +32,7 @@ import numpy as np
 import torch
 
 
-
+'''
 def seed_all(seed=42):
     random.seed(seed)
     np.random.seed(seed)
@@ -42,12 +42,7 @@ def seed_all(seed=42):
     
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    '''
-    # (선택) PyTorch 1.11 이상에서 완전한 결정론 보장
-    try:
-        torch.use_deterministic_algorithms(True)
-    except:
-        pass
+
     '''
 
 
@@ -60,7 +55,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     #############################################################
-    num_train_imgs = len(scene.getTrainCameras())
+    #num_train_imgs = len(scene.getTrainCameras())
     ###############################################################
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -417,7 +412,7 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
 
 if __name__ == "__main__":
     ##############
-    seed_all(42)  # ← 여기에 고정!
+    #seed_all(42)  # ← 여기에 고정!
     ##############
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
