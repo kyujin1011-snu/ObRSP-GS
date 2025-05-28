@@ -139,29 +139,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         ############################
         # gradient 막기
         if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
-            with torch.no_grad():
-                mask = gaussians._opa_remove.view(-1)
-                if gaussians._opacity.grad is not None:
-                    gaussians._opacity.grad[mask] = 0.0
+            
+            mask = gaussians._opa_remove.view(-1)
+            gaussians._opacity.grad[mask] = 0.0
             # 2. optimizer 상태도 0으로 클리어
             param = gaussians._opacity
-            if param in gaussians.optimizer.state:
-                state = gaussians.optimizer.state[param]
-                state["exp_avg"][mask] = 0.0
-                state["exp_avg_sq"][mask] = 0.0
+            state = gaussians.optimizer.state[param]
+            state["exp_avg"][mask] = 0.0
+            state["exp_avg_sq"][mask] = 0.0
 
                 
         if afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
-            with torch.no_grad():
-                mask = gaussians._opa_remove.view(-1)
-                if gaussians._opacity.grad is not None:
-                    gaussians._opacity.grad[mask] = 0.0
+            
+            mask = gaussians._opa_remove.view(-1)
+            gaussians._opacity.grad[mask] = 0.0
             # 2. optimizer 상태도 0으로 클리어
             param = gaussians._opacity
-            if param in gaussians.optimizer.state:
-                state = gaussians.optimizer.state[param]
-                state["exp_avg"][mask] = 0.0
-                state["exp_avg_sq"][mask] = 0.0
+            state = gaussians.optimizer.state[param]
+            state["exp_avg"][mask] = 0.0
+            state["exp_avg_sq"][mask] = 0.0
         ###############################
 
         '''##############################
@@ -207,7 +203,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
 
 
-                ###################################MODE1##################################################
+                '''###################################MODE1##################################################
                 if mode==1: #한번에 삭제 빡빡
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
@@ -218,11 +214,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
                         gaussians.prune_points(final_mask)
-                ###########################################################################################
+                ###########################################################################################'''
 
 
                 ###################################MODE2#################################################
-                elif mode==2: #여러번에 걸쳐서 삭제.
+                if mode==2: #여러번에 걸쳐서 삭제.
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
@@ -288,7 +284,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians._opa_remove[:] = False
 
             #진짜 낮은거 확 삭제제
-            if afterremove==1 and 15000<iteration and iteration%1000==0 and iteration<26000:
+            if afterremove==1 and any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
                 raw_opacity = gaussians._opacity.detach()
                 sigmoid_opacity = torch.sigmoid(raw_opacity)
                 prune_mask = (sigmoid_opacity < 0.01).squeeze()
