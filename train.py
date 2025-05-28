@@ -42,7 +42,7 @@ def seed_all(seed=42):
     
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
+    
     '''
 
 
@@ -144,7 +144,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             state["exp_avg_sq"][mask] = 0.0
 
                 
-        if afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
+        if mode==2 and afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
             
             mask = gaussians._opa_remove.view(-1)
             gaussians._opacity.grad[mask] = 0.0
@@ -198,7 +198,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
 
 
-                '''###################################MODE1##################################################
+                ###################################MODE1##################################################
                 if mode==1: #한번에 삭제 빡빡
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
@@ -209,7 +209,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
                         gaussians.prune_points(final_mask)
-                ###########################################################################################'''
+                ###########################################################################################
 
 
                 ###################################MODE2#################################################
@@ -259,9 +259,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
-
-            #hard pruning
-            if afterremove==1:
+            if mode==1 and afterremove==1:
                 if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
@@ -269,23 +267,39 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                    print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({0.5} 확률)")
+                    print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
+                    gaussians.prune_points(final_mask)  
+
+                    #이건 완전 낮은거 지우기 확 지우기기 
+                    prune_mask = (sigmoid_opacity < 0.01).squeeze()
+
+                    print(f"\nMODE{mode} [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
+                    gaussians.prune_points(prune_mask)
+
+            #hard pruning
+            if mode==2 and afterremove==1:
+                if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
+                    raw_opacity = gaussians._opacity.detach()
+                    sigmoid_opacity = torch.sigmoid(raw_opacity)
+                    prune_mask = (sigmoid_opacity < 0.5).squeeze()
+                    random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
+                    final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+
+                    print(f"\nMODE{mode} 서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
 
                     gaussians._opa_remove[final_mask] = True
-                if any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
+                if iteration%10==0 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
                     gaussians.decay_opacity(0.05)
 
                 if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
-                    gaussians._opa_remove[:] = False
+                    gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
 
-            #진짜 낮은거 확 삭제제
-            if afterremove==1 and any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
-                raw_opacity = gaussians._opacity.detach()
-                sigmoid_opacity = torch.sigmoid(raw_opacity)
-                prune_mask = (sigmoid_opacity < 0.01).squeeze()
+                    raw_opacity = gaussians._opacity.detach()
+                    sigmoid_opacity = torch.sigmoid(raw_opacity)
+                    prune_mask = (sigmoid_opacity < 0.01).squeeze()
 
-                print(f"\n확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
-                gaussians.prune_points(prune_mask)
+                    print(f"\nMODE{mode} 확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
+                    gaussians.prune_points(prune_mask)
 
             ###################bin 출력##########################
             if (iteration % 1000 == 0):
