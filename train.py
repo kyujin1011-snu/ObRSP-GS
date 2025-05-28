@@ -269,6 +269,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
                     gaussians.prune_points(final_mask)  
+                if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
                     #이건 완전 낮은거 지우기 확 지우기기 
