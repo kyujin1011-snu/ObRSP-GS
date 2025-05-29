@@ -207,7 +207,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
+                        #print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
                         gaussians.prune_points(final_mask)
                 ###########################################################################################
 
@@ -222,7 +222,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                        print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
+                        #print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
 
                         gaussians._opa_remove[final_mask] = True
                     if iteration%10==0:
@@ -267,7 +267,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                    print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
+                    #print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
                     gaussians.prune_points(final_mask)  
                 if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
                     raw_opacity = gaussians._opacity.detach()
@@ -275,7 +275,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     #이건 완전 낮은거 지우기 확 지우기기 
                     prune_mask = (sigmoid_opacity < 0.01).squeeze()
 
-                    print(f"\nMODE{mode} [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
+                    #print(f"\nMODE{mode} [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
 
             #hard pruning
@@ -287,7 +287,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
-                    print(f"\nMODE{mode} 서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
+                    #print(f"\nMODE{mode} 서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
 
                     gaussians._opa_remove[final_mask] = True
                 if iteration%10==0 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
@@ -300,10 +300,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
                     prune_mask = (sigmoid_opacity < 0.01).squeeze()
 
-                    print(f"\nMODE{mode} 확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
+                    #print(f"\nMODE{mode} 확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
 
-            ###################bin 출력##########################
+            '''###################bin 출력##########################
             if (iteration % 1000 == 0):
                 
                 # sigmoid 적용
@@ -318,7 +318,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 # 리스트만 출력
                 print(f"\n{iteration}_______")
                 print(bins)
-                #########################################
+                #########################################'''
             '''
             if sourceremove==1 and (iteration==8000):
                 print(f"\n[ITER {iteration}] _source별 평균 opacity 분포 분석")
@@ -365,7 +365,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 print(f"\n[ITER {iteration}] 0.9비율 이상인 인 source를 갖는 가우시안 {prune_mask.sum().item()}개 삭제")
                 gaussians.prune_points(prune_mask)
-'''
+                '''
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
@@ -440,8 +440,8 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000,15_000,30_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000,30_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[30_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
