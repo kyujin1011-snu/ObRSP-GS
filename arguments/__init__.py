@@ -96,6 +96,7 @@ class OptimizationParams(ParamGroup):
         self.score_remove_percent=0.8  #초기에 opacity base제거할 확률
         self.after_score_remove_percent=0.5 #후기에 opacity base제거할 확률
 
+
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

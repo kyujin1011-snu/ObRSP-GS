@@ -288,6 +288,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < args.score_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
                         gaussians.prune_points(final_mask)
+                        print(f"\n scorebased [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians")
 
                 if mode==2 and score_based_prune==1:
                     if iteration in remove_start_iter:
@@ -317,7 +318,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     prune_mask = (sigmoid_opacity < args.opacity_prune_tres).squeeze()
                     random_mask = torch.rand_like(prune_mask.float()) < args.after_opacity_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
-
                     #print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
                     gaussians.prune_points(final_mask)  
                 if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
@@ -339,6 +339,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         random_mask = torch.rand_like(prune_mask.float()) < args.after_score_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
                         gaussians.prune_points(final_mask)
+                        print(f"\n scorebased [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians")
 
             #hard pruning
             if mode==2 and afterremove==1:
