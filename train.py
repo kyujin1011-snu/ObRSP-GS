@@ -44,10 +44,45 @@ def seed_all(seed=42):
     torch.backends.cudnn.benchmark = False
     
     '''
+def score_func(view, gaussians, pipeline, background, scores):
+
+    img_scores = torch.zeros_like(scores)
+    img_scores.requires_grad = True
+
+    image = render(view, gaussians, pipeline, background,
+                   scores=img_scores)['render']
+
+    # Backward computes and stores grad squared values
+    # in img_scores's grad
+    image.sum().backward()
+
+    scores += img_scores.grad
+
+
+def prune(scene, gaussians, pipe, background, prune_ratio):
+
+    with torch.enable_grad():
+        #이건 출력욕욕
+        pbar = tqdm(
+            total=len(scene.getTrainCameras()),
+            desc='Computing Pruning Scores')
+        scores = torch.zeros_like(gaussians.get_opacity)
+        for view in scene.getTrainCameras():
+            score_func(view, gaussians, pipe, background,
+                scores)
+            pbar.update(1)
+        pbar.close()
+
+    return gaussians.pick_prune_gaussians(prune_ratio, scores) #일정 비율 아래 True로로
+
+
+
+
+
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from,
-             mode, remove_start_iter, remove_tres, prob, afterremove, sourceremove):
+             mode, remove_start_iter, afterremove, score_based_prune):
 
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
@@ -203,8 +238,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
-                        prune_mask = (sigmoid_opacity < remove_tres).squeeze()
-                        random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        prune_mask = (sigmoid_opacity < args.opacity_prune_tres).squeeze()
+                        random_mask = torch.rand_like(prune_mask.float()) < args.opacity_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                         #print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
@@ -217,9 +252,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     if iteration in remove_start_iter:
                         raw_opacity = gaussians._opacity.detach()
                         sigmoid_opacity = torch.sigmoid(raw_opacity)
-                        prune_mask = (sigmoid_opacity < remove_tres).squeeze()
+                        prune_mask = (sigmoid_opacity < args.opacity_prune_tres).squeeze()
                         # prob 확률로 True 설정
-                        random_mask = torch.rand_like(prune_mask.float()) < prob  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        random_mask = torch.rand_like(prune_mask.float()) < args.opacity_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                         #print(f"\n서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {remove_tres} ({prob} 확률)")
@@ -243,8 +278,24 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         #####################
                     '''
+                # --- Soft Pruning ---
+                if mode==1 and score_based_prune==1:
+                    if iteration in [5001,8001,11001]:
 
-                ###########################################################################################
+                        prune_mask=prune(
+                            scene, gaussians, pipe, background,
+                            opt.score_prune_ratio)
+                        random_mask = torch.rand_like(prune_mask.float()) < args.score_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+                        gaussians.prune_points(final_mask)
+
+                if mode==2 and score_based_prune==1:
+                    if iteration in remove_start_iter:
+                        prune(
+                            scene, gaussians, pipe, background,
+                            opt.score_prune_ratio)
+
+            ###########################################################################################
 
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
@@ -263,8 +314,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
-                    prune_mask = (sigmoid_opacity < 0.5).squeeze()
-                    random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
+                    prune_mask = (sigmoid_opacity < args.opacity_prune_tres).squeeze()
+                    random_mask = torch.rand_like(prune_mask.float()) < args.after_opacity_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                     #print(f"\nMODE{mode} 지우기기 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
@@ -277,14 +328,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     #print(f"\nMODE{mode} [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
+                
+                #score based prune
+                if mode==1 and score_based_prune==1:
+                    if iteration in [15001,18001,21001]:
+
+                        prune_mask=prune(
+                            scene, gaussians, pipe, background,
+                            opt.after_score_prune_ratio)
+                        random_mask = torch.rand_like(prune_mask.float()) < args.after_score_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
+                        final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
+                        gaussians.prune_points(final_mask)
 
             #hard pruning
             if mode==2 and afterremove==1:
                 if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
-                    prune_mask = (sigmoid_opacity < 0.5).squeeze()
-                    random_mask = torch.rand_like(prune_mask.float()) < 0.5  # 같은 shape의 0~1 uniform 랜덤값 생성
+                    prune_mask = (sigmoid_opacity < args.opacity_prune_tres).squeeze()
+                    random_mask = torch.rand_like(prune_mask.float()) < args.after_opacity_remove_percent  # 같은 shape의 0~1 uniform 랜덤값 생성
                     final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
 
                     #print(f"\nMODE{mode} 서서히 삭제 [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians with opacity < {0.5} ({0.5} 확률)")
@@ -452,13 +514,9 @@ if __name__ == "__main__":
                         help="0: 기본, 1: 완전 삭제, 2: 서서히 삭제")
     parser.add_argument("--remove_start_iter", type=int, nargs='+', default=[7000, 12000],
                         help="삭제 시작 iteration 리스트")
-    parser.add_argument("--remove_tres", type=float, default=0.1,
-                        help="opacity pruning threshold")
-    parser.add_argument("--prob", type=float, default=0.8,
-                        help="pruning probability")
     parser.add_argument("--afterremove", type=int, default=0,
                         help="")
-    parser.add_argument("--sourceremove", type=int, default=0,
+    parser.add_argument("--score_based_prune", type=int, default=0,
                         help="")
     ###################################
 
@@ -477,10 +535,8 @@ if __name__ == "__main__":
     training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from,
          mode=args.mode,
          remove_start_iter=args.remove_start_iter,
-         remove_tres=args.remove_tres,
-         prob=args.prob,
          afterremove=args.afterremove,
-         sourceremove=args.sourceremove
+         score_based_prune=args.score_based_prune
          )
 
     # All done
