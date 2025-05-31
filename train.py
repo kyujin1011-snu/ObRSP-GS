@@ -169,7 +169,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         ############################
         # gradient 막기
         if mode==2 and any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
-            
             mask = gaussians._opa_remove.view(-1)
             gaussians._opacity.grad[mask] = 0.0
             # 2. optimizer 상태도 0으로 클리어
@@ -177,10 +176,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             state = gaussians.optimizer.state[param]
             state["exp_avg"][mask] = 0.0
             state["exp_avg_sq"][mask] = 0.0
-
-                
         if mode==2 and afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
-            
             mask = gaussians._opa_remove.view(-1)
             gaussians._opacity.grad[mask] = 0.0
             # 2. optimizer 상태도 0으로 클리어
@@ -303,11 +299,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     if iteration%10==0:
                         if any(base_iter < iteration <= base_iter + 1000 for base_iter in remove_start_iter):
                         
-                            gaussians.decay_opacity(0.10)
+                            gaussians.decay_opacity(0.15)
 
                     if any(iteration==base_iter + 1000 for base_iter in remove_start_iter):
-                        mask = gaussians._opa_remove.view(-1)
-                        gaussians.prune_points(mask)
                         gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
             ###########################################################################################
 
@@ -392,12 +386,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     print(f"\n MODE2: scorebased [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians")
 
                 if iteration%10==0 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
-                    gaussians.decay_opacity(0.10)
+                    gaussians.decay_opacity(0.15)
 
                 if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
-                    mask = gaussians._opa_remove.view(-1)
-                    gaussians.prune_points(mask)
+
                     gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
+
+                    raw_opacity = gaussians._opacity.detach()
+                    sigmoid_opacity = torch.sigmoid(raw_opacity)
+                    prune_mask = (sigmoid_opacity < 0.005).squeeze()
+
+                    print(f"\nMODE{mode} 진짜진짜 지우기 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
+                    gaussians.prune_points(prune_mask)
             '''###################bin 출력##########################
             if (iteration % 1000 == 0):
                 
