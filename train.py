@@ -63,15 +63,15 @@ def prune(scene, gaussians, pipe, background, prune_ratio):
 
     with torch.enable_grad():
         #이건 출력욕욕
-        pbar = tqdm(
-            total=len(scene.getTrainCameras()),
-            desc='Computing Pruning Scores')
+        #pbar = tqdm(
+        #    total=len(scene.getTrainCameras()),
+        #    desc='Computing Pruning Scores')
         scores = torch.zeros_like(gaussians.get_opacity)
         for view in scene.getTrainCameras():
             score_func(view, gaussians, pipe, background,
                 scores)
-            pbar.update(1)
-        pbar.close()
+            #pbar.update(1)
+        #pbar.close()
 
     return gaussians.pick_prune_gaussians(prune_ratio, scores) #일정 비율 아래 True로로
 
@@ -306,7 +306,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                             gaussians.decay_opacity(0.10)
 
                     if any(iteration==base_iter + 1000 for base_iter in remove_start_iter):
-                        gaussians.prune_points(gaussians._opa_remove[:])
+                        mask = gaussians._opa_remove.view(-1)
+                        gaussians.prune_points(mask)
                         gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
             ###########################################################################################
 
@@ -379,7 +380,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     #print(f"\nMODE{mode} 확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
             #score based prune
-            if opacity_based_prune==1 and mode==1 and afterremove==1:
+            if score_based_prune==1 and mode==2 and afterremove==1:
                 if iteration in [15000,18000,21000]:
 
                     prune_mask=prune(
@@ -394,7 +395,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.decay_opacity(0.10)
 
                 if any(iteration==base_iter + 1000 for base_iter in [15000,18000,21000]):
-                    gaussians.prune_points(gaussians._opa_remove[:])
+                    mask = gaussians._opa_remove.view(-1)
+                    gaussians.prune_points(mask)
                     gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
             '''###################bin 출력##########################
             if (iteration % 1000 == 0):
