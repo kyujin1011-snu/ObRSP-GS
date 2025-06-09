@@ -88,14 +88,16 @@ class OptimizationParams(ParamGroup):
         self.densify_grad_threshold = 0.0002
 
         #my parameter
+        '''
         self.opacity_prune_tres=0.8  #0.5이하 opacity삭제
         self.opacity_remove_percent=1.1  #초기에 opacity base제거할 확률
         self.after_opacity_prune_tres=0.3  #0.5이하 opacity삭제
         self.after_opacity_remove_percent=1.1 #후기에 opacity base제거할 확률
-        self.score_prune_ratio = 0.50      #초기에 점수낮은 애들 비율
-        self.after_score_prune_ratio = 0.50   #
-        self.score_remove_percent=0.8  #초기에 opacity base제거할 확률
-        self.after_score_remove_percent=0.5 #후기에 opacity base제거할 확률
+        '''
+        self.score_prune_ratio = 0.80      #초기에 점수낮은 애들 비율
+        self.after_score_prune_ratio = 0.30   #
+        self.score_remove_percent=1.1  #초기에 opacity base제거할 확률
+        self.after_score_remove_percent=1.1 #후기에 opacity base제거할 확률
 
 
         super().__init__(parser, "Optimization Parameters")
