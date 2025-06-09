@@ -176,7 +176,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             state = gaussians.optimizer.state[param]
             state["exp_avg"][mask] = 0.0
             state["exp_avg_sq"][mask] = 0.0
-        if mode==2 and afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
+        if mode==3 and afterremove==1 and any(base_iter < iteration <= base_iter + 1000 for base_iter in [15000,18000,21000]):
             mask = gaussians._opa_remove.view(-1)
             gaussians._opacity.grad[mask] = 0.0
             # 2. optimizer 상태도 0으로 클리어
@@ -228,7 +228,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
 
-
+                '''
                 ###################################MODE1##################################################
                 if opacity_based_prune==1 and mode==1: #한번에 삭제 빡빡
                     if iteration in remove_start_iter:
@@ -264,6 +264,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     if any(iteration==base_iter + 1000 for base_iter in remove_start_iter):
                         gaussians._opa_remove[:] = False
                     '''
+                
+                '''
                     #디버깅깅
                     if iteration%1000==0:
                         if len(gaussians._opa_remove)!=len(gaussians._opacity):
@@ -273,10 +275,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                         #####################
-                    '''
+                '''
                 # --- Soft Pruning ---
                 if mode==1 and score_based_prune==1:
-                    if iteration in [5000,8000,11000]:
+                    if iteration in [6000,9000,12000]:
 
                         prune_mask=prune(
                             scene, gaussians, pipe, background,
@@ -285,9 +287,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         final_mask = prune_mask & random_mask  # 둘 다 True인 경우만 남김
                         gaussians.prune_points(final_mask)
                         print(f"\n MODE1: scorebased [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians")
-
+                
                 if mode==2 and score_based_prune==1:
-                    if iteration in [5000,8000,11000]:
+                    if iteration in [6000,9000,12000]:
 
                         prune_mask=prune(
                             scene, gaussians, pipe, background,
@@ -304,6 +306,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     if any(iteration==base_iter + 1000 for base_iter in remove_start_iter):
                         gaussians._opa_remove[:] = False #서서히 삭제하는거 없애주기기
             ###########################################################################################
+                
 
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
@@ -317,7 +320,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
-
+            '''
             #hard pruning
             if opacity_based_prune==1 and mode==1 and afterremove==1:
                 if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
@@ -336,10 +339,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     #print(f"\nMODE{mode} [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
-                
+            '''
             #score based prune
             if score_based_prune==1 and mode==1 and afterremove==1:
-                if iteration in [15001,18001,21001]:
+                if iteration in [15000,18000,21000,24000,27000]:
 
                     prune_mask=prune(
                         scene, gaussians, pipe, background,
@@ -349,7 +352,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.prune_points(final_mask)
                     print(f"\n MODE1: scorebased [ITER {iteration}] Pruning {final_mask.sum().item()} Gaussians")
 
-            
+            '''
             if opacity_based_prune==1 and mode==2 and afterremove==1:
                 if iteration%3000==0 and opt.densify_until_iter<=iteration<opt.iterations*0.8:
                     raw_opacity = gaussians._opacity.detach()
@@ -398,6 +401,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     print(f"\nMODE{mode} 진짜진짜 지우기 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
+            '''
             '''###################bin 출력##########################
             if (iteration % 1000 == 0):
                 
