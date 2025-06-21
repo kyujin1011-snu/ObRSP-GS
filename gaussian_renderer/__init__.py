@@ -1,9 +1,9 @@
-#
+
 # Copyright (C) 2023, Inria
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -17,11 +17,11 @@ from utils.sh_utils import eval_sh
 
 def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scores = None, scaling_modifier = 1.0, override_color = None):
     """
-    Render the scene. 
-    
+    Render the scene.
+
     Background tensor (bg_color) must be on GPU!
     """
- 
+
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
     try:
@@ -55,12 +55,9 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     opacity = pc.get_opacity
 
     # set scores to the correct size if not passed in
-    if scores is None:
-        scores = torch.zeros_like(opacity)
 
     # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
     # scaling / rotation by the rasterizer.
-    scales = None
     rotations = None
     cov3D_precomp = None
     if pipe.compute_cov3D_python:
@@ -85,14 +82,13 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     else:
         colors_precomp = override_color
 
-    # Rasterize visible Gaussians to image, obtain their radii (on screen). 
-    rendered_image, radii,t = rasterizer(
+    # Rasterize visible Gaussians to image, obtain their radii (on screen).
+    rendered_image, radii= rasterizer(
         means3D = means3D,
         means2D = means2D,
         shs = shs,
         colors_precomp = colors_precomp,
         opacities = opacity,
-        scores= scores,
         scales = scales,
         rotations = rotations,
         cov3D_precomp = cov3D_precomp)

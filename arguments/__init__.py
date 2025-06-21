@@ -87,7 +87,7 @@ class OptimizationParams(ParamGroup):
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
 
-        #my parameter
+        #my parameter 안쓰임임
         '''
         self.opacity_prune_tres=0.8  #0.5이하 opacity삭제
         self.opacity_remove_percent=1.1  #초기에 opacity base제거할 확률
