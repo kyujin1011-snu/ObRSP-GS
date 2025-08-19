@@ -11,6 +11,7 @@
 
 import os
 import torch
+import time
 from random import randint
 from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
@@ -56,6 +57,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians.training_setup(opt)
     #############################################################
     gaussians_count_log = []
+    hundred_time_ms = 0.0           # CUDA 이벤트(ITER GPU 시간) 누적 (ms)
+    hundred_wall_start = time.time()# 100-step 구간 시작 wall-clock
+    hundred_time_log = []           # (iteration, total_ms, avg_ms, it_per_sec, wall_ms) 기록
     #num_train_imgs = len(scene.getTrainCameras())
     ###############################################################
     if checkpoint:
@@ -166,11 +170,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians._rotation.grad.zero_()
         ##############################'''
         ##############################
-        if iteration % 100 == 0:
-            gaussians_count_log.append(scene.gaussians.get_xyz.shape[0])
         ##############################
 
         iter_end.record()
+        iter_end.synchronize()  # GPU 이벤트 시간 읽기 안전하게
+        elapsed_ms = iter_start.elapsed_time(iter_end)  # ms
+        hundred_time_ms += elapsed_ms
 
 
 
@@ -307,6 +312,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     #print(f"\nMODE{mode} 확확확 지우기기 [ITER {iteration}] Pruning {prune_mask.sum().item()} Gaussians with opacity 0.01삭제")
                     gaussians.prune_points(prune_mask)
+            if iteration % 100 == 0:
+                gaussians_count_log.append((iteration, scene.gaussians.get_xyz.shape[0]))
+
+                # ✅ 100-step 시간 집계
+                wall_ms = (time.time() - hundred_wall_start) * 1000.0
+                avg_ms = hundred_time_ms / 100.0
+                it_per_sec = 1000.0 / avg_ms if avg_ms > 0 else float('inf')
+
+                # 리스트에만 저장
+                hundred_time_log.append((iteration, hundred_time_ms, avg_ms, it_per_sec, wall_ms))
+                # 누적자 리셋
+                hundred_time_ms = 0.0
+                hundred_wall_start = time.time()
 
             '''###################bin 출력##########################
             if (iteration % 1000 == 0):
@@ -371,8 +389,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print(f"\n[ITER {iteration}] 0.9비율 이상인 인 source를 갖는 가우시안 {prune_mask.sum().item()}개 삭제")
                 gaussians.prune_points(prune_mask)
                 '''
-    print("\n[Gaussians Count Log]")
+    print("\n[Gaussians Count Log] (iteration, count)")
     print(gaussians_count_log)
+
+    print("\n[100-step Time Log] (iteration, cuda_total_ms, cuda_avg_ms, it_per_sec, wall_total_ms)")
+    print(hundred_time_log)
 
 def prepare_output_and_logger(args):
     if not args.model_path:
