@@ -55,6 +55,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     #############################################################
+    gaussians_count_log = []
     #num_train_imgs = len(scene.getTrainCameras())
     ###############################################################
     if checkpoint:
@@ -164,6 +165,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians._scaling.grad.zero_()
                 gaussians._rotation.grad.zero_()
         ##############################'''
+        ##############################
+        if iteration % 100 == 0:
+            gaussians_count_log.append(scene.gaussians.get_xyz.shape[0])
+        ##############################
 
         iter_end.record()
 
@@ -366,6 +371,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print(f"\n[ITER {iteration}] 0.9비율 이상인 인 source를 갖는 가우시안 {prune_mask.sum().item()}개 삭제")
                 gaussians.prune_points(prune_mask)
                 '''
+    print("\n[Gaussians Count Log]")
+    print(gaussians_count_log)
 
 def prepare_output_and_logger(args):
     if not args.model_path:
