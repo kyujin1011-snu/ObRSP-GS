@@ -270,7 +270,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
             if (mode==1 or mode==2) and afterremove==1:
-                if iteration in remove_start_iter:
+                if iteration>=150000 and (iteration in remove_start_iter):
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
                     prune_mask = (sigmoid_opacity < remove_tres).squeeze()
