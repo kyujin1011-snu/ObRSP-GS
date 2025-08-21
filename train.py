@@ -270,7 +270,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
             if (mode==1 or mode==2) and afterremove==1:
-                if iteration>=150000 and (iteration in remove_start_iter):
+                if iteration>=15000 and (iteration in remove_start_iter):
                     raw_opacity = gaussians._opacity.detach()
                     sigmoid_opacity = torch.sigmoid(raw_opacity)
                     prune_mask = (sigmoid_opacity < remove_tres).squeeze()
@@ -397,18 +397,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     
     print(f"\n[ITER {iteration}] 최종 opacity histogram (0.01 단위)")
 
-    # sigmoid 적용
-    sigmoid_opacity = torch.sigmoid(gaussians._opacity).detach().cpu().numpy().flatten()
+    with torch.no_grad():
+        opacity = torch.sigmoid(gaussians._opacity).flatten()
 
-    # 구간별 카운트 (0.00~0.99 → bin 0~99, 1.0은 bin 99에 포함)
-    bins = [0] * 100
-    for val in sigmoid_opacity:
-        idx = min(int(val * 100), 99)
-        bins[idx] += 1
+    # 오름차순 정렬
+    sorted_opacity = torch.sort(opacity).values.cpu().numpy()
 
-    # 결과 출력
-    print("Bin counts (0.00~0.01, 0.01~0.02, ..., 0.99~1.00):")
-    print(bins)
+    # 1) 파이썬 리스트 형태로 그대로 ([], , 포함)
+    print(sorted_opacity.tolist())
+
+    # 2) 소수 6자리로 깔끔하게 (원하면 사용)
+    print('[' + ', '.join(f'{x:.6f}' for x in sorted_opacity) + ']')
 
 def prepare_output_and_logger(args):
     if not args.model_path:
